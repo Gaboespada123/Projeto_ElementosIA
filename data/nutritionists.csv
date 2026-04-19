@@ -1,0 +1,21 @@
+nutritionist_id,approach,years_experience,specialty,experience_years
+N001,motivational,13.0,weight_loss,13.0
+N002,empathetic,9.0,general,9.0
+N003,data_driven,5.0,diabetes,5.0
+N004,empathetic ,23.0,sports,23.0
+N005,strict,19.0,weight_loss,19.0
+N006,empathetic,16.0,general,16.0
+N007,motivational,10.0,sports,10.0
+N008,data_driven,99.0,general,99.0
+N009,motivational,14.0,diabetes,14.0
+N010,motivational,11.0,general,11.0
+N011,data_driven,11.0,general,11.0
+N012,,6.0,weight_loss,6.0
+N013,data_driven,3.0,sports,3.0
+N014,empathetic,,sports,
+N015,Strict,22.0,sports,22.0
+N016,empathetic,2.0,weight_loss,2.0
+N017,,21.0,diabetes,21.0
+N018,motivational,20.0,weight_loss,20.0
+N019,empathetic ,7.0,diabetes,7.0
+N020,strict,,diabetes,
