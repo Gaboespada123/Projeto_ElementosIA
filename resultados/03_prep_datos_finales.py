@@ -2,30 +2,34 @@
 =============================================================
   SPRINT - TRANSFORMACIÓN DE DATOS PARA MACHINE LEARNING
 =============================================================
-  Autor      : [tu nombre]
+  
   Input      : dataset_limpo.md  (tabla Markdown con pipes)
   Output     : dados_limpos_final.csv
   Librerías  : pandas, scikit-learn
 =============================================================
 """
-
-import pandas as pd
-from sklearn.preprocessing import StandardScaler
-
+import os 
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
 # ─────────────────────────────────────────────────────────────
 # 1. CARGA DEL ARCHIVO CSV 
 # ─────────────────────────────────────────────────────────────
-# Pega aquí la ruta exacta que copiaste de tu VS Code. 
-# OJO: Cambia las barras \ por / para que Python no se confunda en Windows.
 
-ruta_exacta = "C:/Users/Gabriel/Projeto_ElementosIA/resultados/dataset_limpo.csv" 
+import os
+import pandas as pd
 
+# 1. Obtenemos la ruta de la carpeta donde está guardado este script (.py)
+directorio_actual = os.path.dirname(os.path.abspath(__file__))
+
+# 2. Unimos esa ruta dinámicamente con el nombre del archivo
+ruta_exacta = os.path.join(directorio_actual, "dataset_limpo.csv")
+
+# 3. Cargamos el CSV
 df_raw = pd.read_csv(ruta_exacta)
 
-print(f" Dataset cargado: {df_raw.shape[0]} filas × {df_raw.shape[1]} columnas")
+print(f" Dataset cargado: {df_raw.shape[0]} filas × {df_raw.shape[1]} columnas") 
+
 
 # ─────────────────────────────────────────────────────────────
 # 2. SEPARAR E IDENTIFICAR COLUMNAS POR TIPO
