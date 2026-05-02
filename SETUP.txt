@@ -1,0 +1,6 @@
+CONFIGURAÇÃO DO AMBIENTE - PRIMEIRA EXECUÇÃO
+
+Passo 1: conda create -n projeto-elementos python=3.13 -y
+Passo 2: conda activate projeto-elementos
+Passo 3: pip install -r requirements.txt
+Passo 4: python scripts/modelo_baseline.py
