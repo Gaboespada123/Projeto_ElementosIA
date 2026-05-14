@@ -308,3 +308,42 @@ print(SEP)
 print("\n  Modelos guardados em: modelos/")
 print("    • modelo_xgb_regressao.pickle")
 print("    • modelo_xgb_classificacao.pickle\n")
+
+
+# =============================================================================
+# 6. BÓNUS: IMPORTÂNCIA DAS VARIÁVEIS (FEATURE IMPORTANCE)
+# =============================================================================
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+print(f"\n{SEP}")
+print("  EXTRAINDO A IMPORTÂNCIA DAS VARIÁVEIS (XGBoost Classifier)")
+print(SEP)
+
+# 1. Obter a importância das features do melhor modelo de classificação
+importancias = melhor_clf.feature_importances_
+nomes_features = X_treino.columns
+
+# 2. Criar um DataFrame e ordenar as top 10 variáveis mais importantes
+df_importancia = pd.DataFrame({
+    'Feature': nomes_features,
+    'Importancia': importancias
+}).sort_values(by='Importancia', ascending=False).head(10)
+
+print("\n  Top 10 Variáveis que mais influenciam o Sucesso da Dieta:")
+print(df_importancia.to_string(index=False))
+
+# 3. Gerar e guardar um gráfico elegante para a apresentação (Membro 2) e Relatório (Tu)
+plt.figure(figsize=(10, 6))
+sns.barplot(x='Importancia', y='Feature', data=df_importancia, palette='viridis')
+plt.title('Top 10 Variáveis Mais Importantes (XGBoost)', fontsize=14, fontweight='bold')
+plt.xlabel('Importância Relativa', fontsize=12)
+plt.ylabel('Variável', fontsize=12)
+plt.tight_layout()
+
+# Guardar na pasta de gráficos
+caminho_grafico_importancia = os.path.join("resultados", "graficos", "xgboost_feature_importance.png")
+plt.savefig(caminho_grafico_importancia, dpi=150)
+plt.close()
+
+print(f"\n  [✔] Gráfico de Importância guardado → {caminho_grafico_importancia}\n")
