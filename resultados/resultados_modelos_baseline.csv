@@ -1,3 +1,0 @@
-Modelo,Treino (RMSE/Acurácia),Validação (RMSE/Acurácia),Teste (RMSE/Acurácia)
-Regressão Linear,0.3078,0.5164,1.0778
-Regressão Logística,0.9122,0.8929,0.8959

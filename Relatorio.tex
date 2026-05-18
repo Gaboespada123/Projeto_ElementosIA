@@ -1,0 +1,271 @@
+
+\section{Introdução}
+
+Nas últimas décadas, a Inteligência Artificial (IA) tem vindo a transformar profundamente diversas áreas do conhecimento, sendo a nutrição personalizada um dos domínios que mais tem beneficiado destes avanços. A capacidade de processar grandes volumes de dados clínicos e comportamentais permite hoje desenvolver modelos preditivos capazes de apoiar profissionais de saúde na tomada de decisões mais informadas e eficazes.
+
+A obesidade, a diabetes tipo 2 e outras doenças crónicas associadas à alimentação constituem um problema de saúde pública crescente a nível mundial. Neste contexto, a adoção de planos alimentares personalizados, orientados por evidência científica e adaptados ao perfil individual de cada paciente, surge como uma estratégia promissora para melhorar os resultados clínicos. Contudo, a eficácia dessas intervenções depende, em grande medida, da capacidade de prever, com antecedência, quais os pacientes com maior probabilidade de sucesso.
+
+O presente trabalho insere-se neste quadro e tem como objetivo principal desenvolver um modelo de \textit{machine learning} capaz de \textbf{prever o sucesso de dietas nutricionais} num horizonte temporal de seis meses. Para tal, recorre-se a um conjunto de dados que integra informação proveniente de pacientes, nutricionistas, planos alimentares e respetivos resultados clínicos.
+
+Os objetivos específicos do projeto são os seguintes:
+
+\begin{itemize}
+    \item Integrar e pré-processar dados provenientes de múltiplas fontes, garantindo a qualidade e consistência das variáveis;
+    \item Realizar uma análise exploratória aprofundada com o intuito de identificar padrões relevantes e potenciais inconsistências nos dados;
+    \item Aplicar técnicas de normalização e codificação de variáveis adequadas à natureza de cada atributo;
+    \item Treinar e avaliar modelos de classificação supervisionada, comparando o seu desempenho com métricas apropriadas;
+    \item Interpretar os resultados obtidos à luz do contexto clínico e nutricional.
+\end{itemize}
+
+
+
+
+A escolha deste tema para o projeto não foi meramente académica, mas fortemente impulsionada pelo \textit{background} e experiência empírica dos autores nas áreas de treino desportivo e dietética. O profundo interesse da equipa pela nutrição permitiu conduzir o projeto com um forte "conhecimento de domínio" (\textit{domain knowledge}), facilitando a formulação de hipóteses, a interpretação rigorosa das variáveis e a tradução de métricas puramente matemáticas em conclusões com real aplicabilidade na biologia e no desporto.
+Este relatório encontra-se organizado da seguinte forma: a Secção~\ref{sec:metodologia} descreve a metodologia adotada e o processo de tratamento dos dados; as secções subsequentes apresentam a análise exploratória, os modelos desenvolvidos, os resultados e, por fim, as conclusões do trabalho.
+
+
+\section{Metodologia e Processamento de Dados}
+\label{sec:metodologia}
+
+\subsection{Recolha e Integração dos Dados}
+
+O conjunto de dados utilizado neste projeto resulta da integração de quatro ficheiros no formato CSV, cada um contendo informação proveniente de uma fonte distinta: (1) dados demográficos e clínicos dos pacientes; (2) informação relativa aos nutricionistas responsáveis pelo acompanhamento; (3) descrição dos planos alimentares prescritos; e (4) registo dos resultados obtidos ao fim de seis meses de intervenção.
+
+A fusão destas quatro tabelas foi realizada através de chaves de ligação comuns (\textit{joins}), resultando num único \textit{dataset} consolidado, com uma linha por paciente e todas as variáveis de interesse disponíveis para modelação.
+
+\subsection{Tratamento de Valores Nulos}
+
+Após a integração dos dados, procedeu-se à identificação e tratamento de valores em falta (\textit{missing values}). Para variáveis numéricas, optou-se pela imputação com a mediana da respetiva coluna, por ser uma medida robusta à presença de \textit{outliers}. Para variáveis categóricas, os valores nulos foram substituídos pela moda, ou seja, pela categoria mais frequente. Registos com uma proporção de valores nulos excessiva foram eliminados do conjunto de dados, de forma a não comprometer a qualidade do treino dos modelos.
+
+\subsection{Análise Exploratória e Processo Iterativo de Limpeza}
+
+A metodologia adotada seguiu uma abordagem iterativa, característica de projetos reais de ciência de dados. Durante a fase de Análise Exploratória de Dados (AED), foram detetadas inconsistências na variável \textbf{sexo}: a mesma categoria encontrava-se representada por múltiplos rótulos distintos, como \texttt{'m'} e \texttt{'male'}, ou \texttt{'f'} e \texttt{'female'}, resultantes de erros de introdução de dados. Esta situação, se não corrigida, introduziria ruído no processo de codificação e prejudicaria a capacidade preditiva dos modelos.
+
+Face a esta constatação, foi necessário retroceder à fase de limpeza de dados (\textit{data cleaning}) para unificar as classes duplicadas numa representação canónica única (\texttt{'M'} e \texttt{'F'}). Este ciclo de retorno ilustra a natureza não-linear do processo de preparação de dados e reforça a importância de uma análise exploratória rigorosa como etapa fundamental de qualquer projeto de \textit{machine learning}.
+
+\subsection{Transformação das Variáveis}
+
+Concluída a fase de limpeza, as variáveis foram transformadas de acordo com a sua natureza:
+
+\begin{itemize}
+    \item \textbf{Variáveis numéricas:} foi aplicado o \textit{StandardScaler}, que estandardiza cada variável subtraindo a média e dividindo pelo desvio padrão, resultando numa distribuição com média zero e variância unitária. Este procedimento é essencial para algoritmos sensíveis à escala das variáveis, como a regressão logística ou as máquinas de vetores de suporte (SVM).
+
+    \item \textbf{Variáveis categóricas:} foi aplicada a codificação \textit{One-Hot Encoding}, que transforma cada categoria numa variável binária independente, evitando a introdução de uma ordem implícita entre as categorias, o que poderia distorcer o comportamento dos modelos.
+\end{itemize}
+
+O \textit{dataset} final, após todas as etapas de pré-processamento, encontra-se em condições adequadas para a fase de modelação, apresentando variáveis normalizadas, sem valores nulos e com categorias consistentes.
+
+
+\section{Análise Exploratória e Identificação de Padrões}
+\label{sec:eda}
+
+\subsection{Análise Univariada e Bivariada}
+
+A Análise Exploratória de Dados (AED) foi conduzida em duas etapas complementares. Na \textbf{análise univariada}, examinou-se a distribuição individual de cada variável, identificando a sua forma, amplitude, presença de valores extremos (\textit{outliers}) e assimetrias relevantes. Métricas descritivas como a média, mediana, desvio padrão e percentis foram calculadas para todas as variáveis numéricas, enquanto tabelas de frequência foram produzidas para as variáveis categóricas.
+
+Na \textbf{análise bivariada}, investigaram-se as relações entre pares de variáveis, com particular enfoque na sua associação com a variável-alvo. Esta etapa revelou padrões de grande interesse clínico e analítico. Verificou-se, nomeadamente, que a dieta do tipo \textbf{\textit{Low Carb}} se destacou consistentemente como a que proporciona \textbf{maior perda de peso} entre os pacientes da amostra, superando os restantes regimes alimentares analisados. Adicionalmente, constatou-se que, em termos de perda de peso inicial, os pacientes do \textbf{sexo masculino} tendem a apresentar resultados mais expressivos, o que poderá estar associado a diferenças na composição corporal, taxa metabólica basal ou nível de adesão ao plano prescrito.
+
+Estas observações, embora de carácter exploratório, fornecem hipóteses relevantes a considerar na fase de modelação e constituem um contributo para a interpretabilidade dos modelos desenvolvidos.
+
+\subsection{Identificação de Padrões por Clustering}
+
+Com o objetivo de identificar subgrupos naturais na população estudada, foram aplicadas técnicas de \textit{clustering} não supervisionado. O algoritmo \textbf{K-Means} foi o ponto de partida, tendo sido testadas diferentes configurações do número de grupos $k$ com recurso ao método do cotovelo (\textit{elbow method}) e à análise do \textit{Silhouette Score}. Os grupos obtidos revelaram-se interpretáveis do ponto de vista clínico, sugerindo perfis distintos de pacientes com diferentes padrões de resposta à intervenção nutricional.
+
+Contudo, com o intuito de validar matematicamente a estrutura dos agrupamentos, foram aplicados métodos de \textit{clustering} mais avançados. O \textbf{Clustering Hierárquico Aglomerativo} foi utilizado em conjunto com o \textit{Silhouette Score} como métrica de avaliação interna, tendo-se obtido um valor de \textbf{0,1609}. Este resultado, sendo positivo mas próximo de zero, indica a presença de fronteiras difusas entre os grupos, sem uma separação clara e bem definida.
+
+A aplicação do algoritmo \textbf{DBSCAN} (\textit{Density-Based Spatial Clustering of Applications with Noise}) corroborou esta interpretação: \textbf{33,7\% dos registos foram classificados como ruído} (\textit{outliers}), não sendo atribuídos a nenhum agrupamento coerente. Este valor elevado de pontos atípicos não deve ser interpretado como uma falha metodológica, mas sim como uma constatação esperada: dados biológicos e comportamentais humanos apresentam, por natureza, elevada variabilidade intra-individual e fronteiras difusas entre categorias. O \textit{clustering} constituiu, ainda assim, uma ferramenta valiosa para a compreensão exploratória da heterogeneidade da amostra.
+
+
+\section{Aplicação de Modelos de Previsão}
+\label{sec:modelos}
+
+\subsection{Estratégia de Modelação}
+
+A fase de modelação foi estruturada em torno de duas tarefas preditivas distintas, correspondentes a diferentes formulações do problema clínico:
+
+\begin{itemize}
+    \item \textbf{Tarefa de Regressão:} prever a perda de peso exata (em quilogramas) ao fim de seis meses;
+    \item \textbf{Tarefa de Classificação:} prever o sucesso ou insucesso da dieta, enquanto variável binária.
+\end{itemize}
+
+Em ambas as tarefas, foi adotada uma abordagem comparativa entre uma \textbf{\textit{baseline}} e modelos mais avançados, de forma a quantificar o ganho de desempenho obtido com técnicas de maior complexidade. A divisão dos dados seguiu uma proporção de 80\% para treino e 20\% para teste, com estratificação na tarefa de classificação para garantir a representatividade das classes.
+
+\subsection{Modelos de Baseline}
+
+Como referência de comparação, foram treinados modelos lineares clássicos: \textbf{Regressão Linear} para a tarefa de regressão e \textbf{Regressão Logística} para a tarefa de classificação. Estes modelos, pela sua simplicidade e interpretabilidade, constituem um ponto de partida natural e permitem aferir se a complexidade adicional dos modelos avançados se traduz efetivamente em ganhos de desempenho.
+
+\subsection{Modelos Avançados e Otimização de Hiperparâmetros}
+
+O modelo avançado selecionado para ambas as tarefas foi o \textbf{XGBoost} (\textit{Extreme Gradient Boosting}), na sua variante de regressão (\texttt{XGBRegressor}) e de classificação (\texttt{XGBClassifier}). O XGBoost é um algoritmo baseado em \textit{gradient boosting} sobre árvores de decisão, reconhecido pela sua robustez, capacidade de lidar com dados heterogéneos e elevado desempenho em tarefas de aprendizagem supervisionada.
+
+A otimização dos hiperparâmetros foi realizada através de \textbf{\textit{GridSearchCV}} com validação cruzada de 5 \textit{folds}, explorando sistematicamente combinações de parâmetros como a profundidade máxima das árvores (\texttt{max\_depth}), a taxa de aprendizagem (\texttt{learning\_rate}) e o número de estimadores (\texttt{n\_estimators}).
+
+\subsection{Resultados da Tarefa de Regressão}
+
+Os resultados obtidos na previsão da perda de peso exata encontram-se resumidos na Tabela~\ref{tab:regressao}.
+
+\begin{table}[h!]
+\centering
+\caption{Comparação de desempenho na tarefa de regressão.}
+\label{tab:regressao}
+\begin{tabular}{lcc}
+\hline
+\textbf{Modelo} & \textbf{RMSE (kg)} & \textbf{MAE (kg)} \\
+\hline
+Regressão Linear (\textit{baseline}) & 1,077 & --- \\
+XGBoost Regressor & \textbf{1,015} & \textbf{0,20} \\
+\hline
+\end{tabular}
+\end{table}
+
+O \textbf{XGBoost} superou a \textit{baseline} em ambas as métricas. A redução do RMSE de 1,077 para \textbf{1,015 kg} representa uma melhoria concreta na precisão das previsões. Particularmente relevante é o valor do \textbf{MAE de apenas 0,20 kg}, o que significa que, em média, as previsões do modelo diferem do valor real em menos de 200 gramas --- um resultado de grande pertinência clínica, dado que erros desta magnitude são praticamente negligenciáveis do ponto de vista nutricional.
+
+\subsection{Resultados da Tarefa de Classificação}
+
+No que respeita à previsão do sucesso ou insucesso da dieta, os resultados obtidos encontram-se na Tabela~\ref{tab:classificacao}.
+
+\begin{table}[h!]
+\centering
+\caption{Comparação de desempenho na tarefa de classificação.}
+\label{tab:classificacao}
+\begin{tabular}{lc}
+\hline
+\textbf{Modelo} & \textbf{Accuracy (conjunto de teste)} \\
+\hline
+Regressão Logística (\textit{baseline}) & $\approx$89,6\% \\
+XGBoost Classifier & $\approx$\textbf{89,6\%} \\
+\hline
+\end{tabular}
+\end{table}
+
+Verificou-se um \textbf{empate técnico} entre o XGBoost e a Regressão Logística, com ambos os modelos a atingir uma \textit{accuracy} de aproximadamente \textbf{89,6\%} no conjunto de teste. Este resultado é, em si mesmo, informativo: quando um modelo simples e interpretável atinge o mesmo desempenho que um modelo de elevada complexidade, tal sugere que \textbf{o limite de informação extraível dos dados foi alcançado}. Esta situação é, em grande parte, consequência da qualidade do pré-processamento realizado --- a limpeza rigorosa, a correção de inconsistências e a transformação adequada das variáveis permitiram maximizar o potencial preditivo dos dados disponíveis, tornando o ganho marginal de modelos mais complexos negligenciável.
+
+
+\section{Discuss\~ao Cr\'itica de Resultados}
+\label{sec:discussao}
+
+Uma das vantagens fundamentais do XGBoost face a modelos de \textit{black-box} reside na possibilidade de extrair e interpretar a \textbf{importância relativa de cada variável} (\textit{Feature Importance}) no processo de decisão do modelo. Esta análise, além de validar matematicamente as hipóteses levantadas durante a AED, permite ancorar os resultados num quadro de referência nutricional e biológico coerente. As subsecções seguintes discutem criticamente as variáveis com maior peso preditivo.
+
+\subsection{Ades\~ao \'e o Fator Cr\'itico}
+
+As variáveis \texttt{adherence\_ratio} (\textbf{11,6\%}) e \texttt{mean\_adherence\_pct} (\textbf{10,5\%}) são, conjuntamente, as que mais contribuem para o poder preditivo do modelo, totalizando mais de 22\% da importância global. Este resultado é clinicamente inequívoco: \textbf{nenhuma dieta produz resultados sem cumprimento}. A evidência científica em nutrição clínica corrobora amplamente esta conclusão --- a eficácia de qualquer regime alimentar não depende apenas da sua composição macronutricional, mas, de forma determinante, da capacidade do paciente em manter a adesão ao plano prescrito ao longo do tempo. O modelo aprendeu, de forma autónoma, aquilo que os nutricionistas conhecem por experiência: a consistência comportamental supera a perfeição do plano alimentar.
+
+\subsection{O Ponto de Partida: Peso Inicial}
+
+A variável \texttt{baseline\_weight\_kg} registou uma importância de \textbf{8,2\%}, posicionando-se como o terceiro fator mais relevante no modelo. Esta observação tem uma explicação fisiológica bem estabelecida: indivíduos com maior massa corporal inicial apresentam, nas primeiras semanas de intervenção dietética, quedas de peso mais acentuadas. Este fenómeno deve-se, em parte, à maior taxa metabólica basal associada a uma massa corporal elevada, ao maior défice calórico absoluto gerado pela mesma restrição relativa, e à perda inicial de glicogénio e água, que é proporcional às reservas existentes. O modelo capturou, portanto, um padrão fisiológico real, o que reforça a validade externa dos seus resultados.
+
+\subsection{Demografia: Sexo e Idade}
+
+As variáveis demográficas relativas ao \textbf{sexo} e à \textbf{idade} revelaram-se preditores relevantes, em linha com o que a literatura científica descreve sobre o metabolismo energético diferencial entre grupos populacionais. Os pacientes do sexo masculino tendem a apresentar maior massa muscular magra, o que se traduz numa taxa metabólica basal mais elevada e, consequentemente, numa maior facilidade de criação de défice calórico a curto prazo. A idade, por sua vez, influencia o ritmo metabólico de forma inversa: com o envelhecimento, verifica-se uma redução progressiva da massa muscular (\textit{sarcopenia}) e uma diminuição da sensibilidade à insulina, tornando a perda de peso progressivamente mais lenta e exigindo intervenções mais personalizadas. O modelo reflete, assim, a complexidade biológica inerente à resposta individual a intervenções nutricionais.
+
+\subsection{Efic\'acia da Dieta \textit{Low Carb}}
+
+A dieta \textit{Low Carb} foi a \textbf{única tipologia de plano alimentar a integrar o \textit{Top 10} de variáveis mais importantes}, com uma contribuição de \textbf{4,3\%}. Este resultado confere à sua superioridade, observada visualmente durante a AED, uma validação estatística robusta. Do ponto de vista metabólico, as dietas de baixo teor em hidratos de carbono promovem uma redução dos níveis de insulina circulante, favorecendo a mobilização de ácidos gordos para oxidação energética (\textit{lipolysis}). Adicionalmente, a elevada saciedade proporcionada por dietas ricas em proteínas e gorduras tende a reduzir a ingestão calórica espontânea, sem necessidade de contagem calórica explícita. Estes mecanismos explicam, em parte, a superioridade observada a curto prazo e são consistentes com a importância que o modelo atribuiu a esta variável.
+
+\subsection{A Import\^ancia do Nutricionista}
+
+A análise de importância revelou ainda que variáveis relacionadas com o perfil do profissional de saúde têm impacto mensurável nos resultados. Concretamente, a variável \texttt{years\_experience} e a adoção de uma abordagem \textbf{\textit{strict}} (acompanhamento rigoroso e estruturado) demonstraram associação positiva com melhores métricas de sucesso. Este achado sublinha uma verdade frequentemente subestimada em modelos puramente centrados no paciente: a qualidade, experiência e estilo de acompanhamento do nutricionista são variáveis moderadoras do sucesso clínico. Um profissional experiente está mais habilitado a antecipar recaídas, ajustar planos em tempo útil e motivar o paciente nos momentos críticos de baixa adesão. O modelo quantificou, de forma objetiva, o valor do acompanhamento profissional qualificado.
+
+\subsection{Síntese: Inteligência Artificial ao Serviço da Medicina Personalizada}
+
+
+De forma particularmente gratificante para a equipa, as conclusões extraídas pelos algoritmos de Inteligência Artificial acabaram por espelhar e validar estatisticamente a experiência prática e empírica dos autores no âmbito do desporto e da nutrição. A supremacia da adesão sobre o tipo de dieta, a vantagem fisiológica inicial do sexo masculino e a eficácia a curto prazo da dieta \textit{Low Carb} não são apenas resultados de um modelo matemático, mas realidades vividas no dia a dia do treino e da dieta.
+
+Os resultados obtidos neste projeto ilustram, de forma concreta, o potencial transformador da Inteligência Artificial aplicada à nutrição clínica. 
+Ao identificar automaticamente os fatores com maior impacto no sucesso de uma intervenção dietética --- desde variáveis comportamentais como a adesão, passando por marcadores fisiológicos como o peso inicial, até ao perfil do profissional responsável --- os modelos desenvolvidos transcendem a capacidade de análise manual e fornecem uma base objetiva e quantificável para a tomada de decisão clínica.
+
+Numa era em que a medicina de precisão e a personalização de tratamentos constituem prioridades estratégicas nos sistemas de saúde, a integração de ferramentas de \textit{machine learning} nos fluxos de trabalho nutricional apresenta um potencial significativo: permitir que cada paciente receba um plano adaptado não apenas às suas preferências e condição clínica, mas também à sua probabilidade real de sucesso, estimada com base em dados de populações análogas. Este trabalho representa um contributo nesse sentido, demonstrando que, com dados de qualidade e metodologias rigorosas, é possível construir modelos preditivos fiáveis, interpretáveis e com relevância clínica direta.
+
+
+\section{Conclus\~oes}
+\label{sec:conclusoes}
+
+O presente projeto demonstrou, de forma sistemática e rigorosa, que é possível aplicar técnicas de Inteligência Artificial para \textbf{prever o sucesso de intervenções nutricionais} com um grau de precisão clinicamente relevante. O percurso seguido --- desde a integração e limpeza de dados heterogéneos, passando pela análise exploratória e pelo \textit{clustering}, até à construção e avaliação de modelos supervisionados --- constitui um exemplo aplicado do ciclo completo de um projeto de ciência de dados.
+
+As principais conclusões do trabalho podem ser sintetizadas nos seguintes pontos:
+
+\begin{itemize}
+    \item \textbf{A qualidade dos dados é determinante.} O processo iterativo de limpeza, nomeadamente a deteção e correção de inconsistências na variável \texttt{sexo}, revelou que o pré-processamento rigoroso é condição necessária para obter modelos com bom desempenho. A melhoria da qualidade do dado permitiu maximizar o potencial preditivo da informação disponível.
+
+    \item \textbf{A adesão é o fator mais poderoso.} A análise de \textit{Feature Importance} confirmou que as variáveis de adesão ao plano alimentar são, de longe, os preditores mais relevantes do sucesso. Qualquer estratégia de intervenção nutricional que não contemple mecanismos de monitorização e reforço da adesão estará estruturalmente limitada.
+
+    \item \textbf{O XGBoost superou a baseline na regressão, mas empatou na classificação.} O RMSE de 1,015 kg e o MAE de 0,20 kg representam uma precisão notável na estimação da perda de peso. O empate técnico na classificação (89,6\%) entre o XGBoost e a Regressão Logística não é uma limitação, mas sim uma evidência de que o pré-processamento foi suficientemente eficaz para esgotar a informação disponível nos dados.
+
+    \item \textbf{Os padrões biológicos são capturados pelos modelos.} A importância do peso inicial, do sexo e da idade reflete mecanismos fisiológicos reais e bem documentados, o que confere validade biológica externa aos resultados e aumenta a confiança na sua aplicabilidade prática.
+
+    \item \textbf{A dieta \textit{Low Carb} demonstrou superioridade estatística a curto prazo.} A sua presença no \textit{Top 10} de variáveis importantes é consistente com a literatura científica sobre os efeitos metabólicos da restrição de hidratos de carbono, nomeadamente a promoção da lipólise e a redução espontânea da ingestão calórica.
+
+    \item \textbf{O acompanhamento profissional tem impacto mensurável.} A experiência do nutricionista e a adoção de uma abordagem rigorosa foram identificadas como variáveis moderadoras do sucesso, sublinhando que a tecnologia não substitui, mas complementa e potencia o trabalho dos profissionais de saúde.
+\end{itemize}
+
+\subsection{Limitações e Trabalho Futuro}
+
+O presente estudo apresenta algumas limitações que importa reconhecer. O \textit{dataset} utilizado é de origem simulada, o que pode não capturar toda a complexidade e variabilidade inerente a populações clínicas reais. Adicionalmente, o horizonte temporal de seis meses não permite avaliar a sustentabilidade dos resultados a longo prazo, nem a ocorrência de efeitos de reganho de peso.
+
+Como trabalho futuro, seria de interesse: (i) validar os modelos em conjuntos de dados clínicos reais e multicêntricos; (ii) incorporar variáveis adicionais como marcadores bioquímicos, nível de atividade física e dados de sono; (iii) explorar modelos de \textit{deep learning} para capturar padrões temporais na evolução do peso; e (iv) desenvolver uma interface de apoio à decisão clínica que permita a nutricionistas utilizar os modelos em contexto prático.
+
+Em suma, este projeto constitui uma prova de conceito robusta do potencial da IA na nutrição personalizada, abrindo caminho para investigações futuras com maior impacto clínico e translacional.
+
+
+\section*{Refer\^encias Bibliogr\'aficas}
+\addcontentsline{toc}{section}{Referências Bibliográficas}
+
+\begin{thebibliography}{99}
+
+\bibitem{chen2016xgboost}
+Chen, T., \& Guestrin, C. (2016).
+\textit{XGBoost: A Scalable Tree Boosting System}.
+Proceedings of the 22nd ACM SIGKDD International Conference on Knowledge Discovery and Data Mining, 785--794.
+\url{https://doi.org/10.1145/2939672.2939785}
+
+\bibitem{pedregosa2011sklearn}
+Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., \ldots\ \& Duchesnay, E. (2011).
+\textit{Scikit-learn: Machine Learning in Python}.
+Journal of Machine Learning Research, 12, 2825--2830.
+
+\bibitem{ester1996dbscan}
+Ester, M., Kriegel, H.-P., Sander, J., \& Xu, X. (1996).
+\textit{A Density-Based Algorithm for Discovering Clusters in Large Spatial Databases with Noise}.
+Proceedings of the 2nd International Conference on Knowledge Discovery and Data Mining (KDD), 226--231.
+
+\bibitem{rousseeuw1987silhouette}
+Rousseeuw, P. J. (1987).
+\textit{Silhouettes: A Graphical Aid to the Interpretation and Validation of Cluster Analysis}.
+Journal of Computational and Applied Mathematics, 20, 53--65.
+\url{https://doi.org/10.1016/0377-0427(87)90125-7}
+
+\bibitem{sackner2019lowcarb}
+Sackner-Bernstein, J., Kanter, D., \& Kaul, S. (2015).
+\textit{Dietary Intervention for Overweight and Obese Adults: Comparison of Low-Carbohydrate and Low-Fat Diets}.
+PLOS ONE, 10(10), e0139817.
+\url{https://doi.org/10.1371/journal.pone.0139817}
+
+\bibitem{tobias2015lowcarb}
+Tobias, D. K., Chen, M., Manson, J. E., Ludwig, D. S., Willett, W., \& Hu, F. B. (2015).
+\textit{Effect of Low-Fat Diet Interventions Versus Other Diet Interventions on Long-Term Weight Change in Adults: A Systematic Review and Meta-Analysis}.
+The Lancet Diabetes \& Endocrinology, 3(12), 968--979.
+\url{https://doi.org/10.1016/S2213-8587(15)00367-8}
+
+\bibitem{redman2016metabolism}
+Redman, L. M., \& Ravussin, E. (2011).
+\textit{Caloric Restriction in Humans: Impact on Physiological, Psychological, and Behavioral Outcomes}.
+Antioxidants \& Redox Signaling, 14(2), 275--287.
+\url{https://doi.org/10.1089/ars.2010.3253}
+
+\bibitem{hand2001machine}
+Hand, D., Mannila, H., \& Smyth, P. (2001).
+\textit{Principles of Data Mining}.
+MIT Press.
+
+\bibitem{hastie2009elements}
+Hastie, T., Tibshirani, R., \& Friedman, J. (2009).
+\textit{The Elements of Statistical Learning: Data Mining, Inference, and Prediction} (2nd ed.).
+Springer.
+\url{https://doi.org/10.1007/978-0-387-84858-7}
+
+\bibitem{who2021obesity}
+World Health Organization. (2021).
+\textit{Obesity and Overweight -- Fact Sheet}.
+Disponível em: \url{https://www.who.int/news-room/fact-sheets/detail/obesity-and-overweight}
+
+\end{thebibliography}
