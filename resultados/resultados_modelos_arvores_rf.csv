@@ -1,0 +1,13 @@
+Tarefa,Modelo,Conjunto,RMSE,MAE,Accuracy,F1-Score
+Regressão,Árvore de Decisão,Treino,0.263,0.2007,,
+Regressão,Árvore de Decisão,Validação,0.6225,0.3721,,
+Regressão,Árvore de Decisão,Teste,1.0959,0.4121,,
+Regressão,Random Forest,Treino,0.1101,0.083,,
+Regressão,Random Forest,Validação,0.5153,0.2522,,
+Regressão,Random Forest,Teste,1.0533,0.306,,
+Classificação,Árvore de Decisão,Treino,,,0.9213,0.9204
+Classificação,Árvore de Decisão,Validação,,,0.8492,0.8403
+Classificação,Árvore de Decisão,Teste,,,0.8145,0.824
+Classificação,Random Forest,Treino,,,1.0,1.0
+Classificação,Random Forest,Validação,,,0.8703,0.8631
+Classificação,Random Forest,Teste,,,0.8643,0.8649
