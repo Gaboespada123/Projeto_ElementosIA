@@ -1,10 +1,10 @@
 """
 =============================================================================
-  DISCUSSÃO CRÍTICA DOS RESULTADOS
-  Comparação unificada de todos os modelos do Sprint 3
+  DISCUSSAO CRITICA DOS RESULTADOS
+  Comparacao unificada de todos os modelos do Sprint 3
 =============================================================================
   Carrega os 8 modelos treinados, avalia-os no conjunto de teste,
-  produz a tabela comparativa e os gráficos de análise crítica.
+  produz a tabela comparativa e os graficos de analise critica.
 
   Input  : resultados/dados_limpos_final.csv
            resultados/splits_info.pickle
@@ -18,6 +18,10 @@
 =============================================================================
 """
 
+# Garantir UTF-8 no terminal Windows (evita UnicodeEncodeError)
+import sys, io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+
 import os
 import pickle
 import warnings
@@ -29,9 +33,12 @@ import matplotlib.patches as mpatches
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.metrics import (
     mean_absolute_error,
+    r2_score,
     accuracy_score,
     f1_score,
+    roc_auc_score,
 )
+from sklearn.model_selection import learning_curve
 
 warnings.filterwarnings("ignore")
 
@@ -99,9 +106,15 @@ y_val    = y_total.iloc[idx_val   ].reset_index(drop=True)
 y_teste  = y_total.iloc[idx_teste ].reset_index(drop=True)
 
 mediana_global = y_total.median()
-y_bin_treino = (y_treino > mediana_global).astype(int)
-y_bin_val    = (y_val    > mediana_global).astype(int)
-y_bin_teste  = (y_teste  > mediana_global).astype(int)
+pct_pos = (y_treino < 0).mean() * 100
+if (y_treino < 0).nunique() < 2 or pct_pos > 99 or pct_pos < 1:
+    y_bin_treino = (y_treino > mediana_global).astype(int)
+    y_bin_val    = (y_val    > mediana_global).astype(int)
+    y_bin_teste  = (y_teste  > mediana_global).astype(int)
+else:
+    y_bin_treino = (y_treino < 0).astype(int)
+    y_bin_val    = (y_val    < 0).astype(int)
+    y_bin_teste  = (y_teste  < 0).astype(int)
 
 print(f"\n  Dataset : {df_raw.shape[0]} linhas × {df_raw.shape[1]} colunas")
 print(f"  Treino  : {len(X_treino)} | Validação: {len(X_val)} | Teste: {len(X_teste)}")
@@ -143,6 +156,17 @@ print(f"  Modelos de classificação: {list(modelos_clf.keys())}")
 # 3. CALCULAR MÉTRICAS EM TREINO, VALIDAÇÃO E TESTE
 # =============================================================================
 
+def safe_proba(modelo, X):
+    proba = modelo.predict_proba(X)
+    if proba.shape[1] == 1:
+        return proba[:, 0]
+    return proba[:, 1]
+
+def safe_auc(y_true, y_prob):
+    if len(set(y_true)) < 2:
+        return float("nan")
+    return roc_auc_score(y_true, y_prob)
+
 res_reg = {}
 for nome, modelo in modelos_reg.items():
     res_reg[nome] = {}
@@ -151,10 +175,15 @@ for nome, modelo in modelos_reg.items():
         ("Validação", X_val,    y_val),
         ("Teste",     X_teste,  y_teste),
     ]:
-        pred = modelo.predict(X_s)
+        X_model = X_s.copy()
+        if hasattr(modelo, "feature_names_in_"):
+            X_model.columns = modelo.feature_names_in_
+        
+        pred = modelo.predict(X_model)
         res_reg[nome][conj] = {
             "RMSE": round(rmse(y_s, pred), 4),
             "MAE" : round(float(mean_absolute_error(y_s, pred)), 4),
+            "R2"  : round(float(r2_score(y_s, pred)), 4),
         }
 
 res_clf = {}
@@ -165,10 +194,16 @@ for nome, modelo in modelos_clf.items():
         ("Validação", X_val,    y_bin_val),
         ("Teste",     X_teste,  y_bin_teste),
     ]:
-        pred = modelo.predict(X_s)
+        X_model = X_s.copy()
+        if hasattr(modelo, "feature_names_in_"):
+            X_model.columns = modelo.feature_names_in_
+            
+        pred      = modelo.predict(X_model)
+        pred_prob = safe_proba(modelo, X_model) if hasattr(modelo, "predict_proba") else None
         res_clf[nome][conj] = {
             "Accuracy": round(float(accuracy_score(y_s, pred)), 4),
             "F1-Score": round(float(f1_score(y_s, pred, zero_division=0)), 4),
+            "AUC"     : round(float(safe_auc(y_s, pred_prob)), 4) if pred_prob is not None else None,
         }
 
 
@@ -177,28 +212,31 @@ for nome, modelo in modelos_clf.items():
 # =============================================================================
 
 print(f"\n\n{SEP}")
-print("  REGRESSÃO — RMSE (menor = melhor)")
+print("  REGRESSÃO — RMSE / MAE / R²")
 print(SEP)
-print(f"  {'Modelo':<20} {'RMSE Treino':>12} {'RMSE Val':>10} {'RMSE Teste':>11} {'MAE Teste':>10}")
-print(f"  {SEP2[:64]}")
+print(f"  {'Modelo':<20} {'RMSE Treino':>12} {'RMSE Val':>10} {'RMSE Teste':>11} {'MAE Teste':>10} {'R² Teste':>9}")
+print(f"  {SEP2[:76]}")
 for nome, res in res_reg.items():
     over = "⚠" if res["Teste"]["RMSE"] / max(res["Treino"]["RMSE"], 1e-9) > 2.5 else " "
     print(f"  {nome:<20} {res['Treino']['RMSE']:>12.4f} "
           f"{res['Validação']['RMSE']:>10.4f} "
           f"{res['Teste']['RMSE']:>11.4f} "
-          f"{res['Teste']['MAE']:>10.4f}  {over}")
+          f"{res['Teste']['MAE']:>10.4f} "
+          f"{res['Teste']['R2']:>9.4f}  {over}")
 
 print(f"\n{SEP}")
-print("  CLASSIFICAÇÃO — F1-Score e Accuracy (maior = melhor)")
+print("  CLASSIFICAÇÃO — F1-Score, Accuracy e AUC (maior = melhor)")
 print(SEP)
-print(f"  {'Modelo':<20} {'Acc Treino':>11} {'Acc Val':>9} {'Acc Teste':>10} {'F1 Teste':>10}")
-print(f"  {SEP2[:62]}")
+print(f"  {'Modelo':<20} {'Acc Treino':>11} {'Acc Val':>9} {'Acc Teste':>10} {'F1 Teste':>10} {'AUC Teste':>10}")
+print(f"  {SEP2[:72]}")
 for nome, res in res_clf.items():
     over = "⚠" if res["Treino"]["F1-Score"] - res["Teste"]["F1-Score"] > 0.15 else " "
+    auc_str = f"{res['Teste']['AUC']:>10.4f}" if res['Teste']['AUC'] is not None else f"{'N/A':>10}"
     print(f"  {nome:<20} {res['Treino']['Accuracy']:>11.4f} "
           f"{res['Validação']['Accuracy']:>9.4f} "
           f"{res['Teste']['Accuracy']:>10.4f} "
-          f"{res['Teste']['F1-Score']:>10.4f}  {over}")
+          f"{res['Teste']['F1-Score']:>10.4f}  "
+          f"{auc_str}  {over}")
 print("  ⚠ = possível overfitting (gap treino-teste elevado)")
 
 
@@ -402,6 +440,63 @@ if "Random Forest" in modelos_reg:
         label = f"Top {n:>2}" if n < len(X_total.columns) else f"Todas ({n})"
         diff  = r - min(rmse_sel)
         print(f"    {label}: RMSE = {r:.4f}  (+{diff:.4f} vs melhor)")
+
+
+# =============================================================================
+# 6b. LEARNING CURVES — Deteta underfitting/overfitting por tamanho do dataset
+#     Responde: "Teríamos melhores resultados com mais dados?"
+# =============================================================================
+if "Random Forest" in modelos_reg:
+    print(f"\n{SEP}")
+    print("  LEARNING CURVES — RMSE vs Tamanho do Conjunto de Treino")
+    print(SEP)
+
+    from sklearn.ensemble import RandomForestRegressor as _RF_LC
+    rf_lc = _RF_LC(n_estimators=100, max_depth=7, random_state=42, n_jobs=-1)
+
+    train_sizes, train_scores, val_scores = learning_curve(
+        rf_lc, X_treino, y_treino,
+        cv=5,
+        scoring="neg_root_mean_squared_error",
+        train_sizes=np.linspace(0.1, 1.0, 10),
+        n_jobs=-1,
+    )
+    train_rmse = -train_scores.mean(axis=1)
+    val_rmse   = -val_scores.mean(axis=1)
+    train_std  = train_scores.std(axis=1)
+    val_std    = val_scores.std(axis=1)
+
+    fig, ax = plt.subplots(figsize=(9, 5))
+    ax.plot(train_sizes, train_rmse,  "o-", color="#27ae60", label="Treino (RMSE)")
+    ax.plot(train_sizes, val_rmse,    "o-", color="#e74c3c", label="Validação CV (RMSE)")
+    ax.fill_between(train_sizes, train_rmse - train_std, train_rmse + train_std,
+                    alpha=0.15, color="#27ae60")
+    ax.fill_between(train_sizes, val_rmse   - val_std,   val_rmse   + val_std,
+                    alpha=0.15, color="#e74c3c")
+    ax.set_xlabel("Número de amostras de treino", fontsize=11)
+    ax.set_ylabel("RMSE (kg)", fontsize=11)
+    ax.set_title(
+        "Learning Curve — Random Forest Regressor\n"
+        "(gap treino-validação grande = overfitting | ambas altas = underfitting)",
+        fontsize=12, fontweight="bold",
+    )
+    ax.legend(fontsize=9)
+    _spine_off(ax)
+    plt.tight_layout()
+    c = os.path.join(GRAFICOS, "critica_learning_curve.png")
+    plt.savefig(c, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"  [✔] Gráfico → {c}")
+
+    # Conclusão automática
+    gap_final = val_rmse[-1] - train_rmse[-1]
+    gap_inicial = val_rmse[0] - train_rmse[0]
+    if gap_final < 0.05:
+        print("  → Curvas convergem: modelo bem ajustado, mais dados têm pouco impacto.")
+    elif val_rmse[-1] > val_rmse[int(len(val_rmse)*0.5)]:
+        print("  → Validação aumenta com treino: sinal de overfitting claro.")
+    else:
+        print("  → Validação ainda a melhorar: mais dados podem ajudar.")
 
 
 # =============================================================================

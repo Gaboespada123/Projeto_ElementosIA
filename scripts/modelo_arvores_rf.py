@@ -1,7 +1,7 @@
 """
 =============================================================================
-  SPRINT 3 — MODELOS MEMBRO 2: Árvores de Decisão + Random Forest
-  Feature Importance: que variáveis do nutricionista ou do paciente
+  SPRINT 3 — MODELOS MEMBRO 2: Arvores de Decisao + Random Forest
+  Feature Importance: que variaveis do nutricionista ou do paciente
   mais influenciam o resultado?
 =============================================================================
   Input  : resultados/dados_limpos_final.csv
@@ -19,6 +19,10 @@
 =============================================================================
 """
 
+# Garantir UTF-8 no terminal Windows (evita UnicodeEncodeError com acentos/simbolos)
+import sys, io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+
 import os
 import pickle
 import warnings
@@ -35,14 +39,16 @@ from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
 from sklearn.model_selection import GridSearchCV, KFold, StratifiedKFold
 from sklearn.metrics import (
     mean_absolute_error,
+    r2_score,
     accuracy_score,
     f1_score,
+    roc_auc_score,
     classification_report,
 )
 
 warnings.filterwarnings("ignore")
 
-# Compatibilidade com sklearn < 1.4
+# Compatibilidade com versões antigas do scikit-learn (< 1.4)
 try:
     from sklearn.metrics import root_mean_squared_error as _rmse_fn
     def rmse(y_true, y_pred):
@@ -128,22 +134,51 @@ print(f"    Treino     : {len(X_treino):>5} amostras")
 print(f"    Validação  : {len(X_val):>5} amostras")
 print(f"    Teste      : {len(X_teste):>5} amostras")
 
-# Variável binária — consistente com Membro 1 e Membro 3
-# Classe 1 → acima da mediana (maior variação de peso)
-# Classe 0 → abaixo ou igual à mediana
-mediana_global = y_total.median()
-y_bin_treino = (y_treino > mediana_global).astype(int)
-y_bin_val    = (y_val    > mediana_global).astype(int)
-y_bin_teste  = (y_teste  > mediana_global).astype(int)
+# Definicao binaria: idealmente weight_change < 0 (perdeu peso) = classe 1
+# Mas se todos os pacientes perderam peso, a variavel so tem uma classe.
+# Nesse caso usamos a mediana como threshold (garante ~50/50).
+pct_pos = (y_treino < 0).mean() * 100
+if (y_treino < 0).nunique() < 2 or pct_pos > 99 or pct_pos < 1:
+    mediana_global = y_total.median()
+    y_bin_treino = (y_treino > mediana_global).astype(int)
+    y_bin_val    = (y_val    > mediana_global).astype(int)
+    y_bin_teste  = (y_teste  > mediana_global).astype(int)
+    definicao_bin    = f"weight_change > mediana ({mediana_global:.3f} kg) [fallback]"
+    target_names_clf = ["Abaixo da mediana", "Acima da mediana"]
+    print(f"\n  [AVISO] weight_change < 0 produz {(y_treino < 0).nunique()} classe(s) ({pct_pos:.1f}% positivo).")
+    print(f"  --> Usando fallback: {definicao_bin}")
+else:
+    mediana_global = y_total.median()
+    y_bin_treino = (y_treino < 0).astype(int)
+    y_bin_val    = (y_val    < 0).astype(int)
+    y_bin_teste  = (y_teste  < 0).astype(int)
+    definicao_bin    = "weight_change_kg_6m < 0 (perdeu peso)"
+    target_names_clf = ["Insucesso (ganhou peso)", "Sucesso (perdeu peso)"]
 
-print(f"\n  Mediana global de y : {mediana_global:.4f}")
-print(f"  Distribuição treino — Classe 1: {y_bin_treino.mean()*100:.1f}%  "
-      f"| Classe 0: {(1 - y_bin_treino.mean())*100:.1f}%")
+print(f"\n  Definicao binaria  : {definicao_bin}")
+print(f"  Distribuicao treino: {y_bin_treino.value_counts().to_dict()}")
 
 
 # Validadores cruzados partilhados
 cv_reg = KFold(n_splits=5, shuffle=True, random_state=42)
-cv_clf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+# StratifiedKFold requer pelo menos 2 classes -- usar KFold se necessario
+if y_bin_treino.nunique() >= 2:
+    cv_clf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+else:
+    cv_clf = KFold(n_splits=5, shuffle=True, random_state=42)
+    print("  [AVISO] StratifiedKFold substituido por KFold (target tem 1 classe)")
+
+# Helper: retorna prob da classe positiva de forma segura
+def safe_proba(modelo, X):
+    proba = modelo.predict_proba(X)
+    if proba.shape[1] == 1:
+        return proba[:, 0]  # fallback: so ha uma classe
+    return proba[:, 1]
+
+def safe_auc(y_true, y_prob):
+    if len(set(y_true)) < 2:
+        return float("nan")
+    return roc_auc_score(y_true, y_prob)
 
 
 # =============================================================================
@@ -185,9 +220,11 @@ for nome, X_set, y_set in [
     metricas_dt_reg[nome] = {
         "RMSE": round(rmse(y_set, pred), 4),
         "MAE" : round(mean_absolute_error(y_set, pred), 4),
+        "R2"  : round(r2_score(y_set, pred), 4),
     }
     print(f"  {nome:<12}  RMSE: {metricas_dt_reg[nome]['RMSE']:.4f}  |  "
-          f"MAE: {metricas_dt_reg[nome]['MAE']:.4f}")
+          f"MAE: {metricas_dt_reg[nome]['MAE']:.4f}  |  "
+          f"R²: {metricas_dt_reg[nome]['R2']:.4f}")
 
 with open(os.path.join("modelos", "modelo_arvore_regressao.pickle"), "wb") as f:
     pickle.dump(melhor_dt_reg, f)
@@ -220,22 +257,26 @@ print(f"  F1 CV (5-fold stratified) : {grid_dt_clf.best_score_:.4f}")
 metricas_dt_clf = {}
 for nome, X_set, y_set in [
     ("Treino",    X_treino, y_bin_treino),
-    ("Validação", X_val,    y_bin_val),
+    ("Validacao", X_val,    y_bin_val),
     ("Teste",     X_teste,  y_bin_teste),
 ]:
-    pred = melhor_dt_clf.predict(X_set)
+    pred      = melhor_dt_clf.predict(X_set)
+    pred_prob = safe_proba(melhor_dt_clf, X_set)
     metricas_dt_clf[nome] = {
         "Accuracy": round(accuracy_score(y_set, pred), 4),
         "F1-Score": round(float(f1_score(y_set, pred, zero_division=0)), 4),
+        "AUC"     : round(safe_auc(y_set, pred_prob), 4),
     }
     print(f"  {nome:<12}  Accuracy: {metricas_dt_clf[nome]['Accuracy']:.4f}  |  "
-          f"F1: {metricas_dt_clf[nome]['F1-Score']:.4f}")
+          f"F1: {metricas_dt_clf[nome]['F1-Score']:.4f}  |  "
+          f"AUC: {metricas_dt_clf[nome]['AUC']:.4f}")
 
-print(f"\n  Relatório de Classificação (Conjunto de Teste):")
+print(f"\n  Relatorio de Classificacao (Conjunto de Teste):")
 print(classification_report(
     y_bin_teste,
     melhor_dt_clf.predict(X_teste),
-    target_names=["Abaixo da mediana", "Acima da mediana"],
+    target_names=target_names_clf,
+    zero_division=0,
 ))
 
 with open(os.path.join("modelos", "modelo_arvore_classificacao.pickle"), "wb") as f:
@@ -282,9 +323,11 @@ for nome, X_set, y_set in [
     metricas_rf_reg[nome] = {
         "RMSE": round(rmse(y_set, pred), 4),
         "MAE" : round(mean_absolute_error(y_set, pred), 4),
+        "R2"  : round(r2_score(y_set, pred), 4),
     }
     print(f"  {nome:<12}  RMSE: {metricas_rf_reg[nome]['RMSE']:.4f}  |  "
-          f"MAE: {metricas_rf_reg[nome]['MAE']:.4f}")
+          f"MAE: {metricas_rf_reg[nome]['MAE']:.4f}  |  "
+          f"R²: {metricas_rf_reg[nome]['R2']:.4f}")
 
 with open(os.path.join("modelos", "modelo_rf_regressao.pickle"), "wb") as f:
     pickle.dump(melhor_rf_reg, f)
@@ -317,22 +360,26 @@ print(f"  F1 CV (5-fold stratified) : {grid_rf_clf.best_score_:.4f}")
 metricas_rf_clf = {}
 for nome, X_set, y_set in [
     ("Treino",    X_treino, y_bin_treino),
-    ("Validação", X_val,    y_bin_val),
+    ("Validacao", X_val,    y_bin_val),
     ("Teste",     X_teste,  y_bin_teste),
 ]:
-    pred = melhor_rf_clf.predict(X_set)
+    pred      = melhor_rf_clf.predict(X_set)
+    pred_prob = safe_proba(melhor_rf_clf, X_set)
     metricas_rf_clf[nome] = {
         "Accuracy": round(accuracy_score(y_set, pred), 4),
         "F1-Score": round(float(f1_score(y_set, pred, zero_division=0)), 4),
+        "AUC"     : round(safe_auc(y_set, pred_prob), 4),
     }
     print(f"  {nome:<12}  Accuracy: {metricas_rf_clf[nome]['Accuracy']:.4f}  |  "
-          f"F1: {metricas_rf_clf[nome]['F1-Score']:.4f}")
+          f"F1: {metricas_rf_clf[nome]['F1-Score']:.4f}  |  "
+          f"AUC: {metricas_rf_clf[nome]['AUC']:.4f}")
 
-print(f"\n  Relatório de Classificação (Conjunto de Teste):")
+print(f"\n  Relatorio de Classificacao (Conjunto de Teste):")
 print(classification_report(
     y_bin_teste,
     melhor_rf_clf.predict(X_teste),
-    target_names=["Abaixo da mediana", "Acima da mediana"],
+    target_names=target_names_clf,
+    zero_division=0,
 ))
 
 with open(os.path.join("modelos", "modelo_rf_classificacao.pickle"), "wb") as f:

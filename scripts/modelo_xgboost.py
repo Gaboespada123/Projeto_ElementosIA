@@ -1,7 +1,7 @@
 """
 =============================================================================
-  SPRINT 3 — MODELOS AVANÇADOS: XGBoost + GridSearchCV
-  Membro 3 — Comparação com a baseline do Membro 1
+  SPRINT 3 - MODELOS AVANCADOS: XGBoost + GridSearchCV
+  Membro 3 - Comparacao com a baseline do Membro 1
 =============================================================================
   Input  : resultados/dados_limpos_final.csv
            resultados/splits_info.pickle
@@ -9,6 +9,10 @@
            modelos/modelo_xgb_classificacao.pickle
 =============================================================================
 """
+
+# Garantir UTF-8 no terminal Windows (evita UnicodeEncodeError)
+import sys, io
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
 
 import os
 import pickle
@@ -20,10 +24,11 @@ from xgboost import XGBRegressor, XGBClassifier
 
 from sklearn.model_selection import GridSearchCV, KFold
 from sklearn.metrics import (
-    root_mean_squared_error,   # sklearn >= 1.4; fallback manual abaixo
     mean_absolute_error,
+    r2_score,
     accuracy_score,
     f1_score,
+    roc_auc_score,
 )
 
 warnings.filterwarnings("ignore")
@@ -35,8 +40,7 @@ try:
         return _rmse_fn(y_true, y_pred)
 except ImportError:
     def rmse(y_true, y_pred):
-        return np.sqrt(mean_absolute_error(y_true, y_pred) ** 0
-                       + np.mean((np.array(y_true) - np.array(y_pred)) ** 2))
+        return float(np.sqrt(np.mean((np.array(y_true) - np.array(y_pred)) ** 2)))
 
 # ── Pastas de saída ───────────────────────────────────────────────────────────
 os.makedirs("modelos", exist_ok=True)
@@ -178,6 +182,7 @@ for nome, X_set, y_set in [
     metricas_reg[nome] = {
         "RMSE": round(rmse(y_set, y_pred), 4),
         "MAE" : round(mean_absolute_error(y_set, y_pred), 4),
+        "R2"  : round(r2_score(y_set, y_pred), 4),
     }
 
 # -- 3e. Guardar modelo em pickle ─────────────────────────────────────────────
@@ -195,21 +200,29 @@ print("\n" + "─" * 66)
 print("  MODELO 2 — XGBoost Classifier + GridSearchCV")
 print("─" * 66)
 
-# -- 4a. Recriar a variável binária exatamente como o Membro 1 ─────────────
-#   y_binaria = 1  →  y > mediana (acima da mediana de peso perdido)
-#   y_binaria = 0  →  y ≤ mediana
-#   Mediana calculada sobre y_total (todos os dados) para consistência
+# Definicao binaria: idealmente weight_change < 0 (perdeu peso) = classe 1
+# Mas se todos os pacientes perderam peso, a variavel so tem uma classe.
+# Nesse caso usamos a mediana como threshold (garante ~50/50).
+pct_pos = (y_treino < 0).mean() * 100
+if (y_treino < 0).nunique() < 2 or pct_pos > 99 or pct_pos < 1:
+    mediana_global = y_total.median()
+    y_bin_treino = (y_treino > mediana_global).astype(int)
+    y_bin_val    = (y_val    > mediana_global).astype(int)
+    y_bin_teste  = (y_teste  > mediana_global).astype(int)
+    definicao_bin    = f"weight_change > mediana ({mediana_global:.3f} kg) [fallback]"
+    target_names_clf = ["Abaixo da mediana", "Acima da mediana"]
+    print(f"\n  [AVISO] weight_change < 0 produz {(y_treino < 0).nunique()} classe(s) ({pct_pos:.1f}% positivo).")
+    print(f"  --> Usando fallback: {definicao_bin}")
+else:
+    mediana_global = y_total.median()
+    y_bin_treino = (y_treino < 0).astype(int)
+    y_bin_val    = (y_val    < 0).astype(int)
+    y_bin_teste  = (y_teste  < 0).astype(int)
+    definicao_bin    = "weight_change_kg_6m < 0 (perdeu peso)"
+    target_names_clf = ["Insucesso (ganhou peso)", "Sucesso (perdeu peso)"]
 
-mediana_global = y_total.median()
-
-y_bin_treino = (y_treino > mediana_global).astype(int)
-y_bin_val    = (y_val    > mediana_global).astype(int)
-y_bin_teste  = (y_teste  > mediana_global).astype(int)
-
-print(f"\n  Mediana global de y : {mediana_global:.4f}")
-print(f"  Distribuição binária treino — classe 1: "
-      f"{y_bin_treino.mean() * 100:.1f}%  |  classe 0: "
-      f"{(1 - y_bin_treino.mean()) * 100:.1f}%")
+print(f"\n  Definicao binaria  : {definicao_bin}")
+print(f"  Distribuicao treino: {y_bin_treino.value_counts().to_dict()}")
 
 # -- 4b. Grid de hiperparâmetros ──────────────────────────────────────────────
 param_grid_clf = {
@@ -230,7 +243,24 @@ xgb_clf_base = XGBClassifier(
 
 # -- 4c. GridSearchCV — scoring F1 (mais informativo que accuracy em binário) ─
 from sklearn.model_selection import StratifiedKFold
-cv_clf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+# StratifiedKFold requer pelo menos 2 classes -- usar KFold se necessario
+if y_bin_treino.nunique() >= 2:
+    cv_clf = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+else:
+    cv_clf = KFold(n_splits=5, shuffle=True, random_state=42)
+    print("  [AVISO] StratifiedKFold substituido por KFold (target tem 1 classe)")
+
+# Helper: retorna prob da classe positiva de forma segura
+def safe_proba(modelo, X):
+    proba = modelo.predict_proba(X)
+    if proba.shape[1] == 1:
+        return proba[:, 0]  # fallback: so ha uma classe
+    return proba[:, 1]
+
+def safe_auc(y_true, y_prob):
+    if len(set(y_true)) < 2:
+        return float("nan")
+    return roc_auc_score(y_true, y_prob)
 
 grid_clf = GridSearchCV(
     estimator  = xgb_clf_base,
@@ -254,13 +284,15 @@ melhor_clf = grid_clf.best_estimator_
 metricas_clf = {}
 for nome, X_set, y_set in [
     ("Treino",    X_treino, y_bin_treino),
-    ("Validação", X_val,    y_bin_val),
+    ("Validacao", X_val,    y_bin_val),
     ("Teste",     X_teste,  y_bin_teste),
 ]:
-    y_pred = melhor_clf.predict(X_set)
+    y_pred     = melhor_clf.predict(X_set)
+    y_prob     = safe_proba(melhor_clf, X_set)
     metricas_clf[nome] = {
         "Accuracy": round(accuracy_score(y_set, y_pred), 4),
-        "F1-Score": round(f1_score(y_set, y_pred, zero_division=0), 4),
+        "F1-Score": round(float(f1_score(y_set, y_pred, zero_division=0)), 4),
+        "AUC"     : round(safe_auc(y_set, y_prob), 4),
     }
 
 # -- 4e. Guardar modelo ───────────────────────────────────────────────────────
@@ -284,18 +316,18 @@ print(SEP)
 # ── Regressão ─────────────────────────────────────────────────────────────────
 print("\n  ▸ MODELO 1: XGBoost Regressor")
 print(f"    Melhores hiperparâmetros : {grid_reg.best_params_}")
-print(f"\n  {'Conjunto':<14} {'RMSE':>10} {'MAE':>10}")
-print(f"  {SEP2[:36]}")
+print(f"\n  {'Conjunto':<14} {'RMSE':>10} {'MAE':>10} {'R²':>8}")
+print(f"  {SEP2[:44]}")
 for conjunto, vals in metricas_reg.items():
-    print(f"  {conjunto:<14} {vals['RMSE']:>10.4f} {vals['MAE']:>10.4f}")
+    print(f"  {conjunto:<14} {vals['RMSE']:>10.4f} {vals['MAE']:>10.4f} {vals['R2']:>8.4f}")
 
 # ── Classificação ─────────────────────────────────────────────────────────────
 print(f"\n  ▸ MODELO 2: XGBoost Classifier")
 print(f"    Melhores hiperparâmetros : {grid_clf.best_params_}")
-print(f"\n  {'Conjunto':<14} {'Accuracy':>10} {'F1-Score':>10}")
-print(f"  {SEP2[:36]}")
+print(f"\n  {'Conjunto':<14} {'Accuracy':>10} {'F1-Score':>10} {'AUC':>8}")
+print(f"  {SEP2[:44]}")
 for conjunto, vals in metricas_clf.items():
-    print(f"  {conjunto:<14} {vals['Accuracy']:>10.4f} {vals['F1-Score']:>10.4f}")
+    print(f"  {conjunto:<14} {vals['Accuracy']:>10.4f} {vals['F1-Score']:>10.4f} {vals['AUC']:>8.4f}")
 
 # ── Nota de comparação ────────────────────────────────────────────────────────
 print(f"\n{SEP}")

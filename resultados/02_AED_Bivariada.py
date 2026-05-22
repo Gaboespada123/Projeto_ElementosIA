@@ -15,6 +15,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy import stats
 
 # ── Configurações visuais ──────────────────────────────────────
 sns.set_theme(style="whitegrid", palette="muted")
@@ -95,6 +96,62 @@ plt.close()
 print(f"   Guardado: {GRAFICOS_DIR}/bivariada_correlacao_target.png")
 print("\n  Top correlações com a variável-alvo:")
 print(corr_target.head(8).to_string())
+
+# ── 2b. Testes Estatísticos Formais ―――――――――――――――――――――――――――――――――
+# Os gráficos mostram padrões visuais; os testes confirmam-nos com p-values.
+# Regra: p < 0.05 indica diferença estatísticamente significativa.
+print("\n" + "═" * 55)
+print("  TESTES ESTATÍSTICOS")
+print("═" * 55)
+
+# Teste 1: Diferença de perda de peso entre sexos (Mann-Whitney U)
+# Hipótese nula: distribuição de weight_change igual para homens e mulheres
+if "sex" in df.columns and TARGET in df.columns:
+    grupos_sexo = {s: df[df["sex"] == s][TARGET].dropna() for s in df["sex"].dropna().unique()}
+    if len(grupos_sexo) == 2:
+        keys = list(grupos_sexo.keys())
+        stat, pval = stats.mannwhitneyu(grupos_sexo[keys[0]], grupos_sexo[keys[1]], alternative="two-sided")
+        sig = "** Significativo" if pval < 0.05 else "Não significativo"
+        print(f"\n  1. Mann-Whitney U: {keys[0]} vs {keys[1]} ({TARGET})")
+        print(f"     U={stat:.1f},  p={pval:.4f}  →  {sig} (alpha=0.05)")
+        for k, g in grupos_sexo.items():
+            print(f"     {k}: média={g.mean():.3f} kg, mediana={g.median():.3f} kg, n={len(g)}")
+
+# Teste 2: Diferença de resultado entre tipos de dieta (Kruskal-Wallis)
+# Hipótese nula: distribuição de weight_change igual em todos os tipos de dieta
+if "diet_type" in df.columns and TARGET in df.columns:
+    grupos_dieta = [g[TARGET].dropna().values
+                    for _, g in df.groupby("diet_type")
+                    if len(g) >= 5]
+    if len(grupos_dieta) >= 2:
+        stat_kw, pval_kw = stats.kruskal(*grupos_dieta)
+        sig_kw = "** Significativo" if pval_kw < 0.05 else "Não significativo"
+        print(f"\n  2. Kruskal-Wallis: tipo de dieta vs {TARGET}")
+        print(f"     H={stat_kw:.3f},  p={pval_kw:.4f}  →  {sig_kw} (alpha=0.05)")
+        resumo_dieta = df.groupby("diet_type")[TARGET].agg(["mean", "median", "count"]).round(3)
+        print(resumo_dieta.to_string())
+
+# Teste 3: Correlação de Spearman entre experiência do nutricionista e resultado
+# Usa-se Spearman (robusto a outliers) em vez de Pearson
+if "years_experience" in df.columns and TARGET in df.columns:
+    data_exp = df[["years_experience", TARGET]].dropna()
+    rho, pval_sp = stats.spearmanr(data_exp["years_experience"], data_exp[TARGET])
+    sig_sp = "** Significativo" if pval_sp < 0.05 else "Não significativo"
+    print(f"\n  3. Correlação de Spearman: years_experience vs {TARGET}")
+    print(f"     rho={rho:.4f},  p={pval_sp:.4f}  →  {sig_sp} (alpha=0.05)")
+
+# Teste 4: Diferença entre abordagens do nutricionista (Kruskal-Wallis)
+if "approach" in df.columns and TARGET in df.columns:
+    grupos_abord = [g[TARGET].dropna().values
+                    for _, g in df.groupby("approach")
+                    if len(g) >= 5]
+    if len(grupos_abord) >= 2:
+        stat_ab, pval_ab = stats.kruskal(*grupos_abord)
+        sig_ab = "** Significativo" if pval_ab < 0.05 else "Não significativo"
+        print(f"\n  4. Kruskal-Wallis: abordagem do nutricionista vs {TARGET}")
+        print(f"     H={stat_ab:.3f},  p={pval_ab:.4f}  →  {sig_ab} (alpha=0.05)")
+
+print("═" * 55)
 
 # ── 4. Scatter plots: top features numéricas vs target ────────
 print("\n[3/7] A gerar scatter plots (numéricas vs target)...")

@@ -17,10 +17,11 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, AgglomerativeClustering
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from sklearn.metrics import silhouette_score
+from scipy.cluster.hierarchy import dendrogram, linkage
 
 # ── Configurações visuais ──────────────────────────────────────
 sns.set_theme(style="whitegrid", palette="muted")
@@ -180,6 +181,94 @@ plt.tight_layout()
 plt.savefig(f"{GRAFICOS_DIR}/kmeans_pca_clusters.png", bbox_inches="tight")
 plt.close()
 print(f"   Guardado: {GRAFICOS_DIR}/kmeans_pca_clusters.png")
+
+
+# ═══════════════════════════════════════════════════════════════
+# COMPARAÇÃO: CLUSTERING HIERÁRQUICO vs K-MEANS
+# O enunciado pede "técnicas de clustering" (plural) — testamos dois métodos
+# e justificamos a escolha com base no Silhouette Score.
+# ═══════════════════════════════════════════════════════════════
+print("\n" + "═" * 60)
+print("  COMPARAÇÃO: Clustering Hierárquico (Ward) vs K-Means")
+print("═" * 60)
+
+# ── 1. Clustering Hierárquico com mesmo K que o K-Means ─────────────────
+print(f"\n[a] A treinar Clustering Hierárquico com K={K_OTIMO} (link=ward)...")
+hier = AgglomerativeClustering(n_clusters=K_OTIMO, linkage="ward")
+labels_hier = hier.fit_predict(X_scaled)
+
+# Silhouette Scores comparativos
+sample_n  = min(2000, X_scaled.shape[0])
+sil_kmeans = silhouette_score(X_scaled, labels,       sample_size=sample_n, random_state=42)
+sil_hier   = silhouette_score(X_scaled, labels_hier,  sample_size=sample_n, random_state=42)
+
+print(f"   Silhouette Score — K-Means       : {sil_kmeans:.4f}")
+print(f"   Silhouette Score — Hierárquico   : {sil_hier:.4f}")
+melhor_metodo = "K-Means" if sil_kmeans >= sil_hier else "Hierárquico"
+print(f"   → Melhor método (maior silhouette): {melhor_metodo}")
+
+# ── 2. Dendrograma (amostra de até 500 pontos para legibilidade) ─────────
+print(f"\n[b] A gerar dendrograma (amostra de 200 pontos)...")
+np.random.seed(42)
+amostra_idx = np.random.choice(len(X_scaled), size=min(200, len(X_scaled)), replace=False)
+X_dendro    = X_scaled[amostra_idx]
+
+Z = linkage(X_dendro, method="ward")
+
+fig, ax = plt.subplots(figsize=(14, 6))
+dendrogram(
+    Z, ax=ax,
+    truncate_mode="lastp",  # mostra os últimos p merged clusters
+    p=20,
+    leaf_rotation=90,
+    leaf_font_size=9,
+    color_threshold=Z[-K_OTIMO, 2],  # marca o corte no número de clusters
+)
+ax.axhline(y=Z[-K_OTIMO, 2], color="red", linestyle="--", linewidth=1.5,
+           label=f"Corte para K={K_OTIMO} clusters")
+ax.set_title(f"Dendrograma — Clustering Hierárquico (Ward)\nAmostra de {min(200, len(X_scaled))} observações",
+             fontsize=12, fontweight="bold")
+ax.set_xlabel("Observação")
+ax.set_ylabel("Distância Ward")
+ax.legend(fontsize=9)
+plt.tight_layout()
+plt.savefig(f"{GRAFICOS_DIR}/hier_dendrograma.png", bbox_inches="tight")
+plt.close()
+print(f"   Guardado: {GRAFICOS_DIR}/hier_dendrograma.png")
+
+# ── 3. Gráfico comparativo PCA: K-Means vs Hierárquico ────────────────
+print(f"\n[c] A gerar comparação visual PCA 2D...")
+fig, axes = plt.subplots(1, 2, figsize=(16, 6))
+
+palette_k = sns.color_palette("Set2", K_OTIMO)
+palette_h = sns.color_palette("Set1", K_OTIMO)
+
+for ax, (lbl, nome, pal, sil_val) in zip(
+    axes,
+    [
+        (labels,      f"K-Means (silhouette={sil_kmeans:.3f})",      palette_k, sil_kmeans),
+        (labels_hier, f"Hierárquico Ward (silhouette={sil_hier:.3f})", palette_h, sil_hier),
+    ],
+):
+    for k in range(K_OTIMO):
+        mask = lbl == k
+        ax.scatter(X_pca[mask, 0], X_pca[mask, 1],
+                   c=[pal[k]], label=f"Cluster {k}  (n={mask.sum()})",
+                   alpha=0.45, s=20, edgecolors="none")
+    ax.set_title(nome, fontsize=11, fontweight="bold")
+    ax.set_xlabel(f"PC1 ({var_exp[0]*100:.1f}% var.)", fontsize=9)
+    ax.set_ylabel(f"PC2 ({var_exp[1]*100:.1f}% var.)", fontsize=9)
+    ax.legend(markerscale=1.5, fontsize=8)
+    ax.grid(True, alpha=0.25)
+
+fig.suptitle(f"Comparação: K-Means vs Clustering Hierárquico (K={K_OTIMO})\n"
+             f"Método selecionado: {melhor_metodo} (maior Silhouette Score)",
+             fontsize=12, fontweight="bold")
+plt.tight_layout()
+plt.savefig(f"{GRAFICOS_DIR}/comparacao_kmeans_hier.png", bbox_inches="tight")
+plt.close()
+print(f"   Guardado: {GRAFICOS_DIR}/comparacao_kmeans_hier.png")
+print(f"\n✓ Comparação de métodos concluída. Método final: {melhor_metodo}")
 
 
 # ═══════════════════════════════════════════════════════════════

@@ -14,6 +14,16 @@ df = df.merge(nutritionists, on="nutritionist_id", how="left")
 
 print("\nTamanho inicial do dataset unido:", df.shape)
 
+# Verificar integridade das joins (quantos registos ficaram sem correspondência)
+print("\nVerificação de integridade das joins:")
+print(f"  Registos sem paciente correspondente : {df['age'].isna().sum()}")
+print(f"  Registos sem dieta correspondente    : {df['diet_type'].isna().sum() if 'diet_type' in df.columns else 'N/A'}")
+print(f"  Registos sem nutricionista           : {df['years_experience'].isna().sum() if 'years_experience' in df.columns else 'N/A'}")
+
+# Guardar dataset unido ANTES da limpeza (para mostrar o 'antes/depois' no relatório)
+df.to_csv("resultados/dataset_unido.csv", index=False)
+print("\nDataset unido guardado em 'resultados/dataset_unido.csv' (antes da limpeza)")
+
 # 3. Remover colunas redundantes
 # bmi_redundant parece duplicar baseline_bmi
 # experience_years parece duplicar years_experience
@@ -39,7 +49,7 @@ colunas_media = [
 
 for col in colunas_media:
     if col in df.columns and df[col].isnull().sum() > 0:
-        df[col] = df[col].fillna(df[col].mean())
+        df[col] = df[col].fillna(df[col].median())
 
 # 6. Tratar a variável de resultado
 # Não imputamos a variável-alvo para não inventar resultados

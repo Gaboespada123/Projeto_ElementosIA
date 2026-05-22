@@ -1,0 +1,25 @@
+Tarefa,Modelo,Conjunto,RMSE,MAE,R2,Accuracy,F1-Score,AUC
+Regressão,Reg. Linear,Treino,2.4611,1.8266,0.8873,,,
+Regressão,Reg. Linear,Validação,4.135,1.9743,0.7273,,,
+Regressão,Reg. Linear,Teste,8.6328,2.4764,0.3993,,,
+Regressão,Árvore Decisão,Treino,1.681,1.2739,0.9474,,,
+Regressão,Árvore Decisão,Validação,4.9042,2.9292,0.6163,,,
+Regressão,Árvore Decisão,Teste,8.8244,3.2197,0.3723,,,
+Regressão,Random Forest,Treino,0.877,0.6616,0.9857,,,
+Regressão,Random Forest,Validação,4.1171,2.0005,0.7296,,,
+Regressão,Random Forest,Teste,8.4312,2.4377,0.427,,,
+Regressão,XGBoost,Treino,0.5151,0.3915,0.9951,,,
+Regressão,XGBoost,Validação,3.7338,1.2817,0.7776,,,
+Regressão,XGBoost,Teste,8.1322,1.5977,0.4669,,,
+Classificação,Reg. Logística,Treino,,,,0.9095,0.9077,0.9766
+Classificação,Reg. Logística,Validação,,,,0.8929,0.8868,0.9686
+Classificação,Reg. Logística,Teste,,,,0.8869,0.8908,0.9555
+Classificação,Árvore Decisão,Treino,,,,0.9448,0.9447,0.9901
+Classificação,Árvore Decisão,Validação,,,,0.8567,0.8504,0.8942
+Classificação,Árvore Decisão,Teste,,,,0.8597,0.8658,0.9075
+Classificação,Random Forest,Treino,,,,1.0,1.0,1.0
+Classificação,Random Forest,Validação,,,,0.8763,0.8694,0.956
+Classificação,Random Forest,Teste,,,,0.8597,0.8597,0.9472
+Classificação,XGBoost,Treino,,,,1.0,1.0,1.0
+Classificação,XGBoost,Validação,,,,0.908,0.9036,0.9746
+Classificação,XGBoost,Teste,,,,0.9095,0.9115,0.9707
