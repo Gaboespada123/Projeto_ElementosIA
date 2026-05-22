@@ -39,7 +39,7 @@ colunas_media = [
 
 for col in colunas_media:
     if col in df.columns and df[col].isnull().sum() > 0:
-        df[col] = df[col].fillna(df[col].mean())
+        df[col] = df[col].fillna(df[col].median())
 
 # 6. Tratar a variável de resultado
 # Não imputamos a variável-alvo para não inventar resultados
