@@ -64,8 +64,66 @@ print(f"Colunas categóricas ({len(categ_cols)}): {categ_cols}")
 print("\nEstatísticas descritivas:")
 print(df_work[numeric_cols].describe().round(2).to_string())
 
+# ── 1b. Outliers: comparação antes vs. depois da limpeza ───────
+# O enunciado pede que a EDA destaque outliers. Como a limpeza ocorre
+# antes desta análise, reconstruímos a comparação a partir do dataset bruto.
+print("\n[1/6] A gerar visualização de outliers (antes vs. depois da limpeza)...")
+
+RAW_PATH = "resultados/dataset_unido.csv"
+# Limites físicos definidos em scripts/limpeza_dados.py
+OUTLIER_LIMITS = {
+    "age":                (10, 100),
+    "height_cm":          (120, 230),
+    "baseline_weight_kg": (30, 300),
+    "baseline_bmi":       (10,  80),
+    "sleep_hours":        ( 0,  24),
+}
+
+if os.path.exists(RAW_PATH):
+    df_raw = pd.read_csv(RAW_PATH)
+    variaveis_disp = [v for v in OUTLIER_LIMITS if v in df_raw.columns and v in df.columns]
+
+    if variaveis_disp:
+        n_cols_out = len(variaveis_disp)
+        fig, axes = plt.subplots(2, n_cols_out, figsize=(5 * n_cols_out, 10))
+
+        for i, col in enumerate(variaveis_disp):
+            lo, hi = OUTLIER_LIMITS[col]
+            n_out  = int(((df_raw[col] < lo) | (df_raw[col] > hi)).sum())
+
+            sns.boxplot(y=df_raw[col].dropna(), ax=axes[0, i], color="salmon")
+            axes[0, i].axhline(lo, color="darkred", linestyle="--", linewidth=1.5, label=f"Limite: [{lo}, {hi}]")
+            axes[0, i].axhline(hi, color="darkred", linestyle="--", linewidth=1.5)
+            axes[0, i].set_title(f"{col}\n({n_out} outlier(s) removidos)", fontsize=10, fontweight="bold")
+            axes[0, i].set_ylabel("Antes da limpeza" if i == 0 else "")
+            axes[0, i].legend(fontsize=7)
+
+            sns.boxplot(y=df[col].dropna(), ax=axes[1, i], color="lightgreen")
+            axes[1, i].axhline(lo, color="darkred", linestyle="--", linewidth=1.5)
+            axes[1, i].axhline(hi, color="darkred", linestyle="--", linewidth=1.5)
+            axes[1, i].set_title(f"{col}\n(após limpeza)", fontsize=10, fontweight="bold")
+            axes[1, i].set_ylabel("Após limpeza" if i == 0 else "")
+
+        plt.suptitle(
+            f"Outliers Identificados e Removidos na Limpeza de Dados\n"
+            f"Dataset bruto: {len(df_raw)} registos  ->  Dataset limpo: {len(df)} registos",
+            fontsize=13, fontweight="bold",
+        )
+        plt.tight_layout()
+        plt.savefig(f"{GRAFICOS_DIR}/univariada_outliers_antes_depois.png", bbox_inches="tight")
+        plt.close()
+        print(f"   Guardado: {GRAFICOS_DIR}/univariada_outliers_antes_depois.png")
+
+        print("\n  Resumo de outliers removidos:")
+        for col in variaveis_disp:
+            lo, hi = OUTLIER_LIMITS[col]
+            n_out  = int(((df_raw[col] < lo) | (df_raw[col] > hi)).sum())
+            print(f"    {col:25s}: {n_out:4d} outlier(s)  (limites: [{lo}, {hi}])")
+else:
+    print("   [AVISO] dataset_unido.csv nao encontrado. A saltar visualizacao de outliers.")
+
 # ── 2. Histogramas das variáveis numéricas ─────────────────────
-print("\n[1/5] A gerar histogramas das variáveis numéricas...")
+print("\n[2/6] A gerar histogramas das variáveis numéricas...")
 n_cols_grid = 4
 n_rows_grid = (len(numeric_cols) + n_cols_grid - 1) // n_cols_grid
 
@@ -92,7 +150,7 @@ plt.close()
 print(f"   Guardado: {GRAFICOS_DIR}/univariada_histogramas.png")
 
 # ── 3. Boxplots das variáveis numéricas ───────────────────────
-print("[2/5] A gerar boxplots das variáveis numéricas...")
+print("[3/6] A gerar boxplots das variáveis numéricas...")
 fig, axes = plt.subplots(n_rows_grid, n_cols_grid, figsize=(20, n_rows_grid * 4))
 axes = axes.flatten()
 
@@ -120,7 +178,7 @@ plt.close()
 print(f"   Guardado: {GRAFICOS_DIR}/univariada_boxplots.png")
 
 # ── 4. Análise detalhada da variável-alvo e sucesso ───────────
-print("[3/5] A gerar análise da variável-alvo e sucesso...")
+print("[4/6] A gerar análise da variável-alvo e sucesso...")
 if TARGET in df_work.columns:
     y = df_work[TARGET].dropna()
 
@@ -163,7 +221,7 @@ if TARGET in df_work.columns:
     print(f"    Sem alteração:           {stable} ({stable/len(y)*100:.1f}%)")
 
 # ── 5. Gráficos de barras para variáveis categóricas ──────────
-print("[4/5] A gerar gráficos das variáveis categóricas (inclui estação)...")
+print("[5/6] A gerar gráficos das variáveis categóricas (inclui estação)...")
 if categ_cols:
     n_cats = len(categ_cols)
     fig, axes = plt.subplots(1, n_cats, figsize=(6 * n_cats, 6))
@@ -195,7 +253,7 @@ if categ_cols:
     print(f"   Guardado: {GRAFICOS_DIR}/univariada_categoricas.png")
 
 # ── 6. Taxa de sucesso por estação do ano ─────────────────────
-print("[5/5] A gerar análise de sucesso por estação do ano...")
+print("[6/6] A gerar análise de sucesso por estação do ano...")
 if "estacao" in df_work.columns and "sucesso" in df_work.columns:
     ordem_estacoes = ["inverno", "primavera", "verao", "outono"]
     estacoes_disp  = [e for e in ordem_estacoes if e in df_work["estacao"].values]
@@ -230,4 +288,4 @@ if "estacao" in df_work.columns and "sucesso" in df_work.columns:
     plt.close()
     print(f"   Guardado: {GRAFICOS_DIR}/univariada_sazonalidade.png")
 
-print(f"\n✓ AED Univariada concluída. Gráficos guardados em: {GRAFICOS_DIR}/")
+print(f"\n✓ AED Univariada concluída (6 análises). Gráficos guardados em: {GRAFICOS_DIR}/")
